@@ -1,83 +1,95 @@
-// queries.js
-import pkg from 'pg';
-import dotenv from 'dotenv';
+// server/queries.js
+
+import pkg from "pg";
+import dotenv from "dotenv";
 
 dotenv.config();
 
 const { Pool } = pkg;
 
+// Use Neon connection string with SSL
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // allow Neon SSL cert
+  },
 });
 
-// GET /users
-export const getUsers = async (req, res) => {
+// GET /api/users
+export async function getUsers(req, res) {
   try {
-    const result = await pool.query('SELECT * FROM users ORDER BY id ASC');
-    res.status(200).json(result.rows);
+    const result = await pool.query("SELECT * FROM users ORDER BY id ASC");
+    res.json(result.rows);
   } catch (err) {
-    console.error('Error in getUsers:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error in getUsers:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
-// ... keep your other functions (getUserById, createUser, etc.) the same
-
-// GET /users/:id
-export const getUserById = async (req, res) => {
-  const id = parseInt(req.params.id);
+// GET /api/users/:id
+export async function getUserById(req, res) {
   try {
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    res.status(200).json(result.rows);
+    const id = Number(req.params.id);
+    const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found");
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error in getUserById:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error in getUserById:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-};
+}
 
-// POST /users
-export const createUser = async (req, res) => {
-  const { name, email } = req.body;
+// POST /api/users
+export async function createUser(req, res) {
   try {
-    await pool.query(
-      'INSERT INTO users (name, email) VALUES ($1, $2)',
+    const { name, email } = req.body;
+
+    const result = await pool.query(
+      "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *",
       [name, email]
     );
-    res.status(201).send('User added successfully');
-  } catch (err) {
-    console.error('Error in createUser:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
 
-// PUT /users/:id
-export const updateUser = async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { name, email } = req.body;
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Error in createUser:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// PUT /api/users/:id
+export async function updateUser(req, res) {
   try {
-    await pool.query(
-      'UPDATE users SET name = $1, email = $2 WHERE id = $3',
+    const id = Number(req.params.id);
+    const { name, email } = req.body;
+
+    const result = await pool.query(
+      "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *",
       [name, email, id]
     );
-    res.status(200).send(`User modified with ID: ${id}`);
-  } catch (err) {
-    console.error('Error in updateUser:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
 
-// DELETE /users/:id
-export const deleteUser = async (req, res) => {
-  const id = parseInt(req.params.id);
-  try {
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
-    res.status(200).send(`User deleted with ID: ${id}`);
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found");
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error in deleteUser:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error in updateUser:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-};
+}
+
+// DELETE /api/users/:id
+export async function deleteUser(req, res) {
+  try {
+    const id = Number(req.params.id);
+    await pool.query("DELETE FROM users WHERE id = $1", [id]);
+    res.status(204).send();
+  } catch (err) {
+    console.error("Error in deleteUser:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
