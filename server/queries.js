@@ -23,7 +23,9 @@ export const getUsers = async (req, res) => {
     console.error('Error in getUsers:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-};
+}
+
+// ... keep your other functions (getUserById, createUser, etc.) the same
 
 // GET /users/:id
 export const getUserById = async (req, res) => {
